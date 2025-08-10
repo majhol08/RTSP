@@ -245,10 +245,19 @@ class BigPreview(tk.Toplevel):
             self.after(0, lambda: self.label.config(text="تعذر فتح البث"))
             return
         self.cap = cap
+        consecutive_fail = 0
         while self.running:
-            ok, frame = cap.read()
+            try:
+                ok, frame = cap.read()
+            except Exception:
+                ok = False
             if not ok:
+                consecutive_fail += 1
+                if consecutive_fail >= 10:
+                    break
+                time.sleep(0.1)
                 continue
+            consecutive_fail = 0
             # ملاءمة نافذة المعاينة
             try:
                 w = max(self.label.winfo_width(), 640)
@@ -263,6 +272,8 @@ class BigPreview(tk.Toplevel):
                 self.label.imgtk = imgtk
                 self.label.config(image=imgtk, text="")
             self.after(0, update_on_main)
+        self.running = False
+        self.after(0, lambda: self.label.config(text="انقطع البث"))
 
 class PreviewTile(ttk.Frame):
     def __init__(self, master, cam_id: int, url: str, on_close, on_open_big, *args, **kwargs):
@@ -312,11 +323,15 @@ class PreviewTile(ttk.Frame):
         self.cap = cap
         consecutive_fail = 0
         while self.running:
-            ok, frame = cap.read()
+            try:
+                ok, frame = cap.read()
+            except Exception:
+                ok = False
             if not ok:
                 consecutive_fail += 1
                 if consecutive_fail >= 10:
                     break
+                time.sleep(0.1)
                 continue
             consecutive_fail = 0
             try:
