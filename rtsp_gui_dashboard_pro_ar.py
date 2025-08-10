@@ -11,6 +11,7 @@ RTSP Dashboard — Safe Smart PRO (Arabic UI)
 - معاينات قابلة للتكبير (نافذة عائمة) بالنقر المزدوج.
 - إبراز الحالة بالألوان (ناجحة/فاشلة).
 - حفظ تفضيلات بسيطة (آخر منافذ/خيارات) تلقائياً.
+- أزرار ملونة بأسلوب Bootstrap لتمييز الأوامر المهمة.
 
 ملاحظة: تعتمد على نسخة "PRO" السابقة في المنطق (الكشف الذكي/الكاش/الفحص/المعاينات).
 المتطلبات:
@@ -41,7 +42,13 @@ except Exception:
 
 try:
     import tkinter as tk
-    from tkinter import ttk, messagebox, filedialog, simpledialog
+    from tkinter import messagebox, filedialog, simpledialog
+    try:
+        import ttkbootstrap as ttk
+        BOOTSTRAP = True
+    except Exception:  # pragma: no cover - fallback if ttkbootstrap missing
+        from tkinter import ttk  # type: ignore
+        BOOTSTRAP = False
 except Exception:
     print("tkinter مفقود في بيئتك.")
     raise
@@ -239,10 +246,19 @@ class BigPreview(tk.Toplevel):
             self.after(0, lambda: self.label.config(text="تعذر فتح البث"))
             return
         self.cap = cap
+        consecutive_fail = 0
         while self.running:
-            ok, frame = cap.read()
+            try:
+                ok, frame = cap.read()
+            except Exception:
+                ok = False
             if not ok:
+                consecutive_fail += 1
+                if consecutive_fail >= 10:
+                    break
+                time.sleep(0.1)
                 continue
+            consecutive_fail = 0
             # ملاءمة نافذة المعاينة
             try:
                 w = max(self.label.winfo_width(), 640)
@@ -257,6 +273,8 @@ class BigPreview(tk.Toplevel):
                 self.label.imgtk = imgtk
                 self.label.config(image=imgtk, text="")
             self.after(0, update_on_main)
+        self.running = False
+        self.after(0, lambda: self.label.config(text="انقطع البث"))
 
 class PreviewTile(ttk.Frame):
     def __init__(self, master, cam_id: int, url: str, on_close, on_open_big, *args, **kwargs):
@@ -306,11 +324,15 @@ class PreviewTile(ttk.Frame):
         self.cap = cap
         consecutive_fail = 0
         while self.running:
-            ok, frame = cap.read()
+            try:
+                ok, frame = cap.read()
+            except Exception:
+                ok = False
             if not ok:
                 consecutive_fail += 1
                 if consecutive_fail >= 10:
                     break
+                time.sleep(0.1)
                 continue
             consecutive_fail = 0
             try:
@@ -327,24 +349,33 @@ class PreviewTile(ttk.Frame):
         self.running = False
         self.after(0, self._cleanup)
 
-class Dashboard(tk.Tk):
+root_cls = ttk.Window if BOOTSTRAP else tk.Tk
+
+class Dashboard(root_cls):
     def __init__(self):
-        super().__init__()
+        if BOOTSTRAP:
+            super().__init__(themename="flatly")
+        else:
+            super().__init__()
         self.title(APP_TITLE)
         self.geometry("1360x900")
         self.minsize(1150, 780)
         self.big_previews: Dict[int, BigPreview] = {}
 
-        style = ttk.Style()
-        try: style.theme_use("clam")
-        except Exception: pass
-        style.configure("TButton", padding=8, font=("Segoe UI", 10))
-        style.configure("TLabel", font=("Segoe UI", 10))
-        style.configure("Header.TLabel", font=("Segoe UI", 10, "bold"))
-        style.configure("Good.TLabel", foreground="#137333")
-        style.configure("Warn.TLabel", foreground="#b06d00")
-        style.configure("Bad.TLabel", foreground="#a50e0e")
-        style.configure("URL.TLabel", foreground="#1558d6")
+        self.ui_style = ttk.Style()
+        if not BOOTSTRAP:
+            try:
+                self.ui_style.theme_use("clam")
+            except Exception:
+                pass
+        self.ui_style.configure("TButton", padding=8, font=("Segoe UI", 10))
+        self.ui_style.configure("TLabel", font=("Segoe UI", 10))
+        self.ui_style.configure("Header.TLabel", font=("Segoe UI", 10, "bold"))
+        self.ui_style.configure("Good.TLabel", foreground="#137333")
+        self.ui_style.configure("Warn.TLabel", foreground="#b06d00")
+        self.ui_style.configure("Bad.TLabel", foreground="#a50e0e")
+        self.ui_style.configure("URL.TLabel", foreground="#1558d6")
+        self.ui_style.configure("Status.TLabel", font=("Segoe UI", 10))
 
         self.rows: Dict[int, Dict] = {}
         self.preview_tiles: Dict[int, PreviewTile] = {}
@@ -410,23 +441,25 @@ class Dashboard(tk.Tk):
         self.try_defaults_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(toolbar, text="فحص ذكي", variable=self.smart_var).pack(side="left", padx=6)
         ttk.Checkbutton(toolbar, text="تجربة اعتماد افتراضي (بحدود)", variable=self.try_defaults_var).pack(side="left", padx=6)
+        if BOOTSTRAP:
+            ttk.Button(toolbar, text="🌓 تبديل النسق", command=self.toggle_theme).pack(side="left", padx=6)
 
-        # تقسيم أفقي مرن
-        paned = ttk.PanedWindow(self, orient="horizontal")
+        # واجهة مع تقسيم مرن بين القائمة والمعاينات
+        paned = ttk.Panedwindow(self, orient="horizontal")
         paned.pack(fill="both", expand=True, padx=8, pady=6)
 
-        # اليسار: إدخال IP + الجدول + أزرار
-        left = ttk.Frame(paned, padding=8)
-        paned.add(left, weight=3)
+        # لوحة الكاميرات (يسار)
+        cam_tab = ttk.Frame(paned, padding=8)
+        paned.add(cam_tab, weight=1)
 
-        ips_box = ttk.LabelFrame(left, text="ألصق عنوان IP في كل سطر", padding=8)
+        ips_box = ttk.LabelFrame(cam_tab, text="ألصق عنوان IP في كل سطر", padding=8)
         ips_box.pack(fill="x")
         self.ips_text = tk.Text(ips_box, height=4)
         self.ips_text.pack(fill="x", expand=False)
         ttk.Button(ips_box, text="إضافة إلى القائمة", command=self.on_add).pack(anchor="e", pady=(6,0))
 
         # شريط بحث/تصفية
-        search_bar = ttk.Frame(left)
+        search_bar = ttk.Frame(cam_tab)
         search_bar.pack(fill="x", pady=(8,4))
         ttk.Label(search_bar, text="تصفية:").pack(side="left")
         self.filter_entry = ttk.Entry(search_bar, width=40)
@@ -434,7 +467,7 @@ class Dashboard(tk.Tk):
         self.filter_entry.bind("<KeyRelease>", lambda e: self._refresh_table())
 
         # الجدول
-        table_box = ttk.LabelFrame(left, text="الكاميرات", padding=6)
+        table_box = ttk.LabelFrame(cam_tab, text="الكاميرات", padding=6)
         table_box.pack(fill="both", expand=True)
 
         cols = ("id","ip","vendor","path","status","latency","url")
@@ -468,32 +501,44 @@ class Dashboard(tk.Tk):
         self.tree.bind("<Button-3>", self._popup_menu)
 
         # أزرار أسفل الجدول + نسخ سريع
-        actions = ttk.Frame(left)
+        actions = ttk.Frame(cam_tab)
         actions.pack(fill="x", pady=(6,0))
         self.filter_var = tk.StringVar(value="ALL")
         for txt in ("ALL","SUCCESS","FAILED"):
             ttk.Radiobutton(actions, text=txt, value=txt, variable=self.filter_var, command=self._refresh_table).pack(side="left", padx=4)
 
-        ttk.Button(actions, text="🔎 فحص الكل", command=self.on_probe_all).pack(side="right", padx=4)
-        ttk.Button(actions, text="فحص المحدد", command=self.on_probe_selected).pack(side="right", padx=4)
-        ttk.Button(actions, text="تعيين مسار للمحدد", command=self.on_set_path_selected).pack(side="right", padx=4)
+        btn_probe_all = ttk.Button(actions, text="🔎 فحص الكل", command=self.on_probe_all)
+        if BOOTSTRAP: btn_probe_all.config(bootstyle="info-outline")
+        btn_probe_all.pack(side="right", padx=4)
+        btn_probe_sel = ttk.Button(actions, text="فحص المحدد", command=self.on_probe_selected)
+        if BOOTSTRAP: btn_probe_sel.config(bootstyle="secondary")
+        btn_probe_sel.pack(side="right", padx=4)
+        btn_set_path = ttk.Button(actions, text="تعيين مسار للمحدد", command=self.on_set_path_selected)
+        if BOOTSTRAP: btn_set_path.config(bootstyle="warning")
+        btn_set_path.pack(side="right", padx=4)
 
-        copy_bar = ttk.Frame(left)
+        copy_bar = ttk.Frame(cam_tab)
         copy_bar.pack(fill="x", pady=(6,0))
         ttk.Button(copy_bar, text="نسخ IPs المحددة", command=lambda: self.copy_from_selection("ip")).pack(side="left", padx=4)
         ttk.Button(copy_bar, text="نسخ URLs المحددة", command=lambda: self.copy_from_selection("url")).pack(side="left", padx=4)
         ttk.Button(copy_bar, text="نسخ الصفوف المحددة", command=lambda: self.copy_from_selection("row")).pack(side="left", padx=4)
 
-        control_bar = ttk.Frame(left)
+        control_bar = ttk.Frame(cam_tab)
         control_bar.pack(fill="x", pady=(6,0))
-        ttk.Button(control_bar, text="▶️ تشغيل معاينة", command=self.on_start_selected).pack(side="left", padx=4)
-        ttk.Button(control_bar, text="⏹ إيقاف معاينة", command=self.on_stop_selected).pack(side="left", padx=4)
-        ttk.Button(control_bar, text="📸 لقطة", command=self.on_snapshot_selected).pack(side="left", padx=4)
+        btn_start = ttk.Button(control_bar, text="▶️ تشغيل معاينة", command=self.on_start_selected)
+        if BOOTSTRAP: btn_start.config(bootstyle="success")
+        btn_start.pack(side="left", padx=4)
+        btn_stop = ttk.Button(control_bar, text="⏹ إيقاف معاينة", command=self.on_stop_selected)
+        if BOOTSTRAP: btn_stop.config(bootstyle="danger")
+        btn_stop.pack(side="left", padx=4)
+        btn_snap = ttk.Button(control_bar, text="📸 لقطة", command=self.on_snapshot_selected)
+        if BOOTSTRAP: btn_snap.config(bootstyle="secondary-outline")
+        btn_snap.pack(side="left", padx=4)
 
-        # اليمين: معاينات + حالة
-        right = ttk.Frame(paned, padding=8)
-        paned.add(right, weight=2)
-        preview_box = ttk.LabelFrame(right, text="المعاينات (320×240) — انقر مرتين للتكبير", padding=8)
+        # لوحة المعاينات (يمين)
+        prev_tab = ttk.Frame(paned, padding=8)
+        paned.add(prev_tab, weight=1)
+        preview_box = ttk.LabelFrame(prev_tab, text="المعاينات (320×240) — انقر مرتين للتكبير", padding=8)
         preview_box.pack(fill="both", expand=True)
         self.preview_grid = ttk.Frame(preview_box)
         self.preview_grid.pack(fill="both", expand=True)
@@ -503,6 +548,13 @@ class Dashboard(tk.Tk):
 
         # إنهاء: إعادة رسم أولية
         self._refresh_table()
+
+    def toggle_theme(self):
+        if not BOOTSTRAP:
+            return
+        current = self.ui_style.theme_use()
+        new_theme = "darkly" if current != "darkly" else "flatly"
+        self.ui_style.theme_use(new_theme)
 
     # ----------------- Helpers -----------------
     def _popup_menu(self, event):
