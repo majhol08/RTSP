@@ -346,20 +346,20 @@ class Dashboard(root_cls):
         self.minsize(1150, 780)
         self.big_previews: Dict[int, BigPreview] = {}
 
-        self.style = ttk.Style()
+        self.ui_style = ttk.Style()
         if not BOOTSTRAP:
             try:
-                self.style.theme_use("clam")
+                self.ui_style.theme_use("clam")
             except Exception:
                 pass
-        self.style.configure("TButton", padding=8, font=("Segoe UI", 10))
-        self.style.configure("TLabel", font=("Segoe UI", 10))
-        self.style.configure("Header.TLabel", font=("Segoe UI", 10, "bold"))
-        self.style.configure("Good.TLabel", foreground="#137333")
-        self.style.configure("Warn.TLabel", foreground="#b06d00")
-        self.style.configure("Bad.TLabel", foreground="#a50e0e")
-        self.style.configure("URL.TLabel", foreground="#1558d6")
-        self.style.configure("Status.TLabel", font=("Segoe UI", 10))
+        self.ui_style.configure("TButton", padding=8, font=("Segoe UI", 10))
+        self.ui_style.configure("TLabel", font=("Segoe UI", 10))
+        self.ui_style.configure("Header.TLabel", font=("Segoe UI", 10, "bold"))
+        self.ui_style.configure("Good.TLabel", foreground="#137333")
+        self.ui_style.configure("Warn.TLabel", foreground="#b06d00")
+        self.ui_style.configure("Bad.TLabel", foreground="#a50e0e")
+        self.ui_style.configure("URL.TLabel", foreground="#1558d6")
+        self.ui_style.configure("Status.TLabel", font=("Segoe UI", 10))
 
         self.rows: Dict[int, Dict] = {}
         self.preview_tiles: Dict[int, PreviewTile] = {}
@@ -524,9 +524,9 @@ class Dashboard(root_cls):
     def toggle_theme(self):
         if not BOOTSTRAP:
             return
-        current = self.style.theme_use()
+        current = self.ui_style.theme_use()
         new_theme = "darkly" if current != "darkly" else "flatly"
-        self.style.theme_use(new_theme)
+        self.ui_style.theme_use(new_theme)
 
     # ----------------- Helpers -----------------
     def _popup_menu(self, event):
