@@ -11,6 +11,7 @@ RTSP Dashboard — Safe Smart PRO (Arabic UI)
 - معاينات قابلة للتكبير (نافذة عائمة) بالنقر المزدوج.
 - إبراز الحالة بالألوان (ناجحة/فاشلة).
 - حفظ تفضيلات بسيطة (آخر منافذ/خيارات) تلقائياً.
+- أزرار ملونة بأسلوب Bootstrap لتمييز الأوامر المهمة.
 
 ملاحظة: تعتمد على نسخة "PRO" السابقة في المنطق (الكشف الذكي/الكاش/الفحص/المعاينات).
 المتطلبات:
@@ -443,13 +444,13 @@ class Dashboard(root_cls):
         if BOOTSTRAP:
             ttk.Button(toolbar, text="🌓 تبديل النسق", command=self.toggle_theme).pack(side="left", padx=6)
 
-        # واجهة على شكل ألسنة
-        notebook = ttk.Notebook(self)
-        notebook.pack(fill="both", expand=True, padx=8, pady=6)
+        # واجهة مع تقسيم مرن بين القائمة والمعاينات
+        paned = ttk.Panedwindow(self, orient="horizontal")
+        paned.pack(fill="both", expand=True, padx=8, pady=6)
 
-        # تبويب الكاميرات
-        cam_tab = ttk.Frame(notebook, padding=8)
-        notebook.add(cam_tab, text="الكاميرات")
+        # لوحة الكاميرات (يسار)
+        cam_tab = ttk.Frame(paned, padding=8)
+        paned.add(cam_tab, weight=1)
 
         ips_box = ttk.LabelFrame(cam_tab, text="ألصق عنوان IP في كل سطر", padding=8)
         ips_box.pack(fill="x")
@@ -506,9 +507,15 @@ class Dashboard(root_cls):
         for txt in ("ALL","SUCCESS","FAILED"):
             ttk.Radiobutton(actions, text=txt, value=txt, variable=self.filter_var, command=self._refresh_table).pack(side="left", padx=4)
 
-        ttk.Button(actions, text="🔎 فحص الكل", command=self.on_probe_all).pack(side="right", padx=4)
-        ttk.Button(actions, text="فحص المحدد", command=self.on_probe_selected).pack(side="right", padx=4)
-        ttk.Button(actions, text="تعيين مسار للمحدد", command=self.on_set_path_selected).pack(side="right", padx=4)
+        btn_probe_all = ttk.Button(actions, text="🔎 فحص الكل", command=self.on_probe_all)
+        if BOOTSTRAP: btn_probe_all.config(bootstyle="info-outline")
+        btn_probe_all.pack(side="right", padx=4)
+        btn_probe_sel = ttk.Button(actions, text="فحص المحدد", command=self.on_probe_selected)
+        if BOOTSTRAP: btn_probe_sel.config(bootstyle="secondary")
+        btn_probe_sel.pack(side="right", padx=4)
+        btn_set_path = ttk.Button(actions, text="تعيين مسار للمحدد", command=self.on_set_path_selected)
+        if BOOTSTRAP: btn_set_path.config(bootstyle="warning")
+        btn_set_path.pack(side="right", padx=4)
 
         copy_bar = ttk.Frame(cam_tab)
         copy_bar.pack(fill="x", pady=(6,0))
@@ -518,13 +525,19 @@ class Dashboard(root_cls):
 
         control_bar = ttk.Frame(cam_tab)
         control_bar.pack(fill="x", pady=(6,0))
-        ttk.Button(control_bar, text="▶️ تشغيل معاينة", command=self.on_start_selected).pack(side="left", padx=4)
-        ttk.Button(control_bar, text="⏹ إيقاف معاينة", command=self.on_stop_selected).pack(side="left", padx=4)
-        ttk.Button(control_bar, text="📸 لقطة", command=self.on_snapshot_selected).pack(side="left", padx=4)
+        btn_start = ttk.Button(control_bar, text="▶️ تشغيل معاينة", command=self.on_start_selected)
+        if BOOTSTRAP: btn_start.config(bootstyle="success")
+        btn_start.pack(side="left", padx=4)
+        btn_stop = ttk.Button(control_bar, text="⏹ إيقاف معاينة", command=self.on_stop_selected)
+        if BOOTSTRAP: btn_stop.config(bootstyle="danger")
+        btn_stop.pack(side="left", padx=4)
+        btn_snap = ttk.Button(control_bar, text="📸 لقطة", command=self.on_snapshot_selected)
+        if BOOTSTRAP: btn_snap.config(bootstyle="secondary-outline")
+        btn_snap.pack(side="left", padx=4)
 
-        # تبويب المعاينات
-        prev_tab = ttk.Frame(notebook, padding=8)
-        notebook.add(prev_tab, text="المعاينات")
+        # لوحة المعاينات (يمين)
+        prev_tab = ttk.Frame(paned, padding=8)
+        paned.add(prev_tab, weight=1)
         preview_box = ttk.LabelFrame(prev_tab, text="المعاينات (320×240) — انقر مرتين للتكبير", padding=8)
         preview_box.pack(fill="both", expand=True)
         self.preview_grid = ttk.Frame(preview_box)
